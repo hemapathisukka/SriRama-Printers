@@ -1,0 +1,10 @@
+Go to Users & Access and add each person. Give each a password of at least 8 characters.
+Go to Settings → Team access → Download login file (users.json). Upload that file to the public repo, next to index.html.
+Send people just the website address. Repeat steps 3 and 4 whenever you add, remove or change a user.
+
+Read this before giving it to 100 people:
+
+Weak passwords are the weak point. Anyone can download users.json, and a guessable password could unlock your data. Passwords must be at least 8 characters, and I'd ask for long ones.
+Removing a user doesn't fully lock them out. A person who has already signed in keeps access on their device until you create a new admin token, enter it in Settings and re-upload users.json.
+Staff permissions only limit what the app shows. Anyone who signs in holds the same GitHub token underneath.
+Heavy simultaneous use is risky. All records live in one file. I made saves merge changes from different devices, but two people editing the same record at once can lose one edit, and a deleted record can reappear. For a few people this is fine. For 100 people working at the same time, a real database such as Supabase or Firebase is the right choice. I can set that up next if you want it.
