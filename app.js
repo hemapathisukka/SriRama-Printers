@@ -169,27 +169,42 @@ const canDel=m=>has(m,'d');
 const sess=()=>{try{localStorage.setItem('pp_me',ME.id)}catch(e){}};
 const fb=s=>{let h=5381,i=s.length;while(i)h=(h*33)^s.charCodeAt(--i);return'f'+(h>>>0).toString(16)};
 async function hash(u,p){const s='pp:'+u.toLowerCase()+':'+p;try{if(crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}}catch(e){}return fb(s)}
-function loginScreen(){$('nav').style.display='none';const first=!DB.users.length;
- const form=`<form onsubmit="return ${first?'setup':'login'}(event)">${first?'<label>Your name<input name="fname" required></label>':''}
- <label>Username<input name="username" required autocomplete="username"></label>
- <label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label>
- ${first?'<label>Confirm password<input name="confirm" type="password" required></label>':''}
- <button style="width:100%;margin-top:10px">${first?'Create admin and start':'Sign in'}</button><p id="lerr" class="neg"></p></form>`;
- const conn=`<details ${first?'open':''} style="margin-top:12px"><summary>${first?'Load your existing accounts from GitHub':'Connect GitHub storage'}</summary>
- <label>Setup link or code (from your admin)<input id="gCode" placeholder="Paste setup link or code"></label><button class="s" type="button" onclick="ghCode()">Connect</button>
- <p><small>Or enter the details:</small></p><label>GitHub username<input id="gO"></label><label>Private data repository<input id="gR"></label><label>Token<input id="gT" type="password"></label><button class="s" type="button" onclick="ghConnect()">Connect &amp; load data</button></details>`;
- $('#main').innerHTML=`<div class="box" style="max-width:380px;margin:6vh auto"><h2 style="color:var(--d)">🦜 ${esc(DB.set.name)}</h2>`+(first?`<p>No account found on this device yet. Connect to load your team's accounts.</p>${conn}<details style="margin-top:12px"><summary>First time ever? Create the admin account</summary>${form}</details>`:`<p>Sign in to continue.</p>${form}${conn}`)+`</div>`}
+function loginScreen(){$('nav').style.display='none';const adm=location.hash=='#setup',first=!DB.users.length;
+ const loginForm=`<form onsubmit="return login(event)"><label>Username<input name="username" required autocomplete="username"></label>
+ <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+ <button style="width:100%;margin-top:10px">Sign in</button><p id="lerr" class="neg"></p></form>`;
+ const setupForm=`<form onsubmit="return setup(event)"><label>Your name<input name="fname" required></label><label>Username<input name="username" required autocomplete="username"></label>
+ <label>Password (min 8 characters)<input name="password" type="password" required minlength="8" autocomplete="new-password"></label><label>Confirm password<input name="confirm" type="password" required></label>
+ <button style="width:100%;margin-top:10px">Create admin and start</button><p id="lerr" class="neg"></p></form>`;
+ const conn=`<details style="margin-top:12px"><summary>Connect GitHub storage</summary><label>GitHub username<input id="gO"></label><label>Private data repository<input id="gR"></label><label>Admin token<input id="gT" type="password"></label><button class="s" type="button" onclick="ghConnect()">Connect &amp; load data</button></details>`;
+ $('#main').innerHTML=`<div class="box" style="max-width:380px;margin:8vh auto"><h2 style="color:var(--d)">🦜 ${esc(DB.set.name)}</h2>`+(adm?`<p>Administrator setup</p>${first?setupForm:'<p>An admin account already exists. <a href="#">Back to sign in</a></p>'}${conn}`:`<p>Sign in to continue.</p>${loginForm}`)+`</div>`}
+window.addEventListener('hashchange',()=>{if(!ME)draw()});
+const pbk=async(pw,salt)=>crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']),{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+const b64a=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+async function mkBlob(pw){const g=GH();if(!g.token)return null;const sl=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),
+ c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await pbk(pw,sl),new TextEncoder().encode(JSON.stringify({owner:g.owner,repo:g.repo,token:g.token})));return{s:b64a(sl),i:b64a(iv),c:b64a(c)}}
+async function openBlob(b,pw){const k=await pbk(pw,unb64(b.s));return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(b.i)},k,unb64(b.c))))}
+function loginFile(){const L=DB.users.filter(u=>u.active&&u.tk).map(u=>({u:u.username,...u.tk})),miss=DB.users.filter(u=>u.active&&!u.tk).length;
+ dl('users.json',JSON.stringify(L),'application/json');toast(L.length+' login(s) exported.'+(miss?' '+miss+' user(s) are missing: they must sign in once, or have their password reset.':''))}
+function mergeDB(rd){let ch=false;const newer=(rd.ts||0)>(DB.ts||0);
+ ['customers','enquiries','quotations','orders','payments','inventory','suppliers','expenses','users'].forEach(k=>{const loc=DB[k]=DB[k]||[];(rd[k]||[]).forEach(x=>{const i=loc.findIndex(y=>y.id==x.id);
+  if(i<0){loc.push(x);ch=true}else if(newer&&JSON.stringify(loc[i])!=JSON.stringify(x)){if(ME&&loc[i]===ME){Object.assign(loc[i],x)}else loc[i]=x;ch=true}})});
+ DB.imported=DB.imported||[];(rd.imported||[]).forEach(r=>{if(!DB.imported.includes(r)){DB.imported.push(r);ch=true}});
+ if(newer&&rd.set&&JSON.stringify(rd.set)!=JSON.stringify(DB.set)){DB.set=rd.set;ch=true}return ch}
 async function setup(e){e.preventDefault();const f=new FormData(e.target),un=f.get('username').trim().toLowerCase();
  if(f.get('password')!=f.get('confirm')){$('#lerr').textContent='Passwords do not match';return false}
  const u={id:uid(),username:un,name:f.get('fname').trim(),role:'Admin',admin:true,active:true,perms:{},pass:await hash(un,f.get('password'))};
- DB.users.push(u);ME=u;log('Admin account created');sess();save();route='dash';draw();return false}
-async function login(e){e.preventDefault();const err=$('#lerr'),f=new FormData(e.target);
+ try{u.tk=await mkBlob(f.get('password'))}catch(x){}DB.users.push(u);ME=u;log('Admin account created');sess();save();route='dash';draw();return false}
+async function login(e){e.preventDefault();const err=$('#lerr'),f=new FormData(e.target),pw=f.get('password');
  if(Date.now()<lockUntil){err.textContent='Too many attempts. Wait 30 seconds.';return false}
- const un=f.get('username').trim().toLowerCase(),u=DB.users.find(x=>x.username==un&&x.active);
- if(u&&u.pass==await hash(un,f.get('password'))){fails=0;ME=u;sess();log('Signed in');save();route='dash';draw();autoSync()}
+ const un=f.get('username').trim().toLowerCase();err.textContent='Signing in...';
+ const h=await hash(un,pw);let u=DB.users.find(x=>x.username==un&&x.active&&x.pass==h);
+ if(!u){try{const L=await(await fetch('users.json?'+Date.now())).json(),b=L.find(x=>x.u==un);
+   if(b){const g=await openBlob(b,pw);localStorage.setItem('pp_gh',JSON.stringify(g));await ghPull();u=DB.users.find(x=>x.username==un&&x.active&&x.pass==h)}}catch(x){}}
+ if(u){fails=0;ME=u;if(!u.tk&&GH().token){try{u.tk=await mkBlob(pw)}catch(x){}}sess();log('Signed in');save();route='dash';draw();autoSync()}
  else{if(++fails>=5){lockUntil=Date.now()+30000;fails=0}err.textContent='Wrong username or password.'}return false}
 function logout(){ME=null;try{localStorage.removeItem('pp_me')}catch(e){}draw()}
-async function chPw(){const p=prompt('New password (min 6 characters):');if(!p)return;if(p.length<6)return alert('Too short');ME.pass=await hash(ME.username,p);log('Password changed');save();alert('Password changed')}
+async function chPw(){const p=prompt('New password (min 8 characters):');if(!p)return;if(p.length<8)return alert('Too short');ME.pass=await hash(ME.username,p);try{ME.tk=await mkBlob(p)}catch(x){}log('Password changed');save();alert('Password changed')}
 function usersView(){return`<div class="top"><button onclick="uEdit()">+ Add user</button></div><div class="wrap"><table><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th></tr>
  ${DB.users.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.admin?'Admin':esc(u.role)}</td><td><span class="bd ${u.active?'':'r'}">${u.active?'Active':'Disabled'}</span></td><td><button class="s" onclick="uEdit('${u.id}')">Edit</button> ${u.id!=ME.id?`<button class="x" onclick="uDel('${u.id}')">✕</button>`:''}</td></tr>`).join('')}</table></div>
  <p><small>For each person, tick what they may View, Add, Edit and Delete in every section. Administrators can do everything and are the only ones who see Users, Audit Log and Settings.</small></p>`}
@@ -197,7 +212,7 @@ function uEdit(id){const u=id?DB.users.find(x=>x.id==id):{perms:{},active:true,r
  $('#modal').innerHTML=`<div class="m"><div><h3>${id?'Edit':'Add'} user</h3><form onsubmit="return uSave(event,'${id||''}')">
  <label>Full name<input name="fname" required value="${esc(u.name)}"></label>
  <label>Username<input name="username" required value="${esc(u.username)}" autocomplete="off"></label>
- <label>${id?'New password (leave blank to keep)':'Password (min 6 characters)'}<input name="password" type="password" ${id?'':'required'} minlength="6" autocomplete="new-password"></label>
+ <label>${id?'New password (leave blank to keep)':'Password (min 8 characters)'}<input name="password" type="password" ${id?'':'required'} minlength="8" autocomplete="new-password"></label>
  <label>Role template (fills the ticks below)<select name="role" onchange="tpl(this.value)">${['Custom',...Object.keys(TPL)].map(r=>`<option ${r==u.role?'selected':''}>${r}</option>`).join('')}</select></label>
  <label><input type="checkbox" name="admin" ${u.admin?'checked':''} style="display:inline;width:auto"> Administrator (full access)</label>
  <label><input type="checkbox" name="active" ${u.active?'checked':''} style="display:inline;width:auto"> Account active</label>
@@ -209,7 +224,8 @@ async function uSave(e,id){e.preventDefault();const f=e.target,fd=new FormData(f
  if(old&&old.username!=un&&!pw)return alert('Username changed – please set a new password too.');
  const perms={};f.querySelectorAll('[data-m]:checked').forEach(i=>perms[i.dataset.m]=(perms[i.dataset.m]||'')+i.dataset.c);
  for(const m in perms)if(!perms[m].includes('v'))perms[m]='v'+perms[m];
- const u={id:id||uid(),username:un,name:fd.get('fname').trim(),role:fd.get('role'),admin:!!fd.get('admin'),active:!!fd.get('active'),perms,pass:pw?await hash(un,pw):old.pass};
+ const u={id:id||uid(),username:un,name:fd.get('fname').trim(),role:fd.get('role'),admin:!!fd.get('admin'),active:!!fd.get('active'),perms,pass:pw?await hash(un,pw):old.pass,tk:pw?await mkBlob(pw):(old&&old.tk)};
+ if(pw&&!u.tk)toast('Connect GitHub storage first, so this user can sign in from other devices.');
  if(u.id==ME.id&&!u.active)return alert('You cannot disable your own account.');
  if(!DB.users.filter(x=>x.id!=u.id).concat(u).some(x=>x.admin&&x.active))return alert('Keep at least one active Administrator.');
  if(old)Object.assign(old,u);else DB.users.push(u);
@@ -238,16 +254,19 @@ let ghSha=null,pushT=null,syncing=false;
 async function ghApi(path,opt){opt=opt||{};const g=GH(),r=await fetch('https://api.github.com/repos/'+g.owner+'/'+g.repo+path,{...opt,headers:{Authorization:'Bearer '+g.token,Accept:'application/vnd.github+json','Content-Type':'application/json'}});
  if(!r.ok)throw new Error(String(r.status));return r.status==204?null:r.json()}
 async function ghPull(){if(!GH().token)return false;let f;try{f=await ghApi('/contents/data.json')}catch(e){if(e.message=='404')return false;throw e}
- ghSha=f.sha;const rd=JSON.parse(ub64s(f.content));if((rd.ts||0)>(DB.ts||0)||(!DB.users.length&&(rd.users||[]).length)){DB=rd;DB.users=DB.users||[];try{localStorage.setItem('pp',JSON.stringify(DB))}catch(e){}return true}return false}
+ ghSha=f.sha;const rd=JSON.parse(ub64s(f.content));let ch;
+ if(!DB.users.length&&(rd.users||[]).length){DB=rd;DB.users=DB.users||[];ch=true}else ch=mergeDB(rd);
+ if(ch)try{localStorage.setItem('pp',JSON.stringify(DB))}catch(e){}return ch}
 async function ghPush(){if(!GH().token||!DB.users.length)return;const put=()=>ghApi('/contents/data.json',{method:'PUT',body:JSON.stringify({message:'Update data',content:b64s(JSON.stringify(DB)),...(ghSha?{sha:ghSha}:{})})});
- try{ghSha=(await put()).content.sha}catch(e){if(!['409','422'].includes(e.message))throw e;try{ghSha=(await ghApi('/contents/data.json')).sha}catch(x){ghSha=null}ghSha=(await put()).content.sha}}
+ try{ghSha=(await put()).content.sha}catch(e){if(!['409','422'].includes(e.message))throw e;try{const f=await ghApi('/contents/data.json');ghSha=f.sha;mergeDB(JSON.parse(ub64s(f.content)))}catch(x){ghSha=null}ghSha=(await put()).content.sha}}
 function schedPush(){if(!GH().token)return;clearTimeout(pushT);pushT=setTimeout(()=>ghPush().catch(e=>toast('GitHub save failed ('+e.message+')')),4000)}
 function toast(m){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',6000)}
 async function pullReq(){let n=0;const loc=inbox();if(loc.length){loc.forEach(r=>{n+=importReq(r)});setInbox([])}
  if(GH().token&&DB.set.privKey){const is=(await ghApi('/issues?state=open&per_page=100')).reverse();
   for(const i of is){if(i.pull_request)continue;let r;try{r=await dec(i.body)}catch(e){continue}n+=importReq(r);await ghApi('/issues/'+i.number,{method:'PATCH',body:JSON.stringify({state:'closed'})}).catch(()=>{})}}
  if(n){save();draw()}return n}
-async function autoSync(){if(!ME||syncing||!(ME.admin||has('orders','a')))return;syncing=true;try{const n=await pullReq();if(n)toast(n+' new online request(s) added to Enquiries / Orders / Quotations')}catch(e){}syncing=false}
+async function autoSync(){if(!ME||syncing)return;syncing=true;try{if(GH().token&&await ghPull())draw()}catch(e){if(e.message=='401'){toast('Session expired. Please sign in again.');logout()}}
+ if(!(ME&&(ME.admin||has('orders','a')))){syncing=false;return}try{const n=await pullReq();if(n)toast(n+' new online request(s) added to Enquiries / Orders / Quotations')}catch(e){}syncing=false}
 function startSync(){const go=()=>autoSync();if(GH().token)ghPull().then(ch=>{if(ch)ME=ME&&DB.users.find(u=>u.id==ME.id&&u.active)||null;draw();go()}).catch(()=>{draw();go()});else go();setInterval(go,30000)}
 window.addEventListener('storage',autoSync);
 async function ghSave(){const g={owner:$('#ghO').value.trim(),repo:$('#ghR').value.trim(),token:$('#ghT').value.trim()||GH().token};
@@ -261,7 +280,7 @@ async function ghConnect(){const g={owner:$('#gO').value.trim(),repo:$('#gR').va
 function ghBox(){const g=GH();return`<div class="box"><h3>GitHub storage</h3><p><small>Your data is saved to a <b>private</b> repository on GitHub, so you can open the app on any device. The token stays on this device only.</small></p>
  <label>GitHub username<input id="ghO" value="${esc(g.owner)}"></label><label>Private data repository name<input id="ghR" value="${esc(g.repo)}"></label><label>Admin token ${g.token?'(saved - leave blank to keep)':''}<input id="ghT" type="password"></label>
  <button onclick="ghSave()">Save &amp; connect</button> <button class="s" onclick="ghPush().then(()=>toast('Saved to GitHub')).catch(e=>toast('Failed: '+e.message))">Save now</button>
- <h4>Team access</h4><p><small>Send this link privately to staff. Opening it once on a device connects it, and they only sign in with their own username. Anyone with the link can reach your data, so treat it like a password.</small></p><button class="s" onclick="shareLink()">Create setup link</button><input id="linkOut" readonly style="width:100%;margin-top:8px"><h4>Customer page connection</h4><p><small>Customer requests are encrypted before they reach GitHub. Create keys once, then paste the text below into <code>config.js</code> (and add the customer token).</small></p>
+ <h4>Team access</h4><p><small>Upload the downloaded <code>users.json</code> to your public website repo (next to index.html). Then anyone who opens your website address only sees a username and password box. Redo this whenever you add, remove or change a user.</small></p><button class="s" onclick="loginFile()">Download login file (users.json)</button><h4>Customer page connection</h4><p><small>Customer requests are encrypted before they reach GitHub. Create keys once, then paste the text below into <code>config.js</code> (and add the customer token).</small></p>
  <button class="s" onclick="genKeys()">Create encryption keys</button> <button class="s" onclick="cfgText()">Show config.js text</button><textarea id="cfgOut" rows="5" readonly style="width:100%;margin-top:8px"></textarea></div>`}
 async function genKeys(){if(DB.set.privKey&&!confirm('Keys already exist. Creating new ones means unread old requests cannot be opened. Continue?'))return;
  const k=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
