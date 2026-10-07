@@ -170,12 +170,15 @@ const sess=()=>{try{localStorage.setItem('pp_me',ME.id)}catch(e){}};
 const fb=s=>{let h=5381,i=s.length;while(i)h=(h*33)^s.charCodeAt(--i);return'f'+(h>>>0).toString(16)};
 async function hash(u,p){const s='pp:'+u.toLowerCase()+':'+p;try{if(crypto&&crypto.subtle){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}}catch(e){}return fb(s)}
 function loginScreen(){$('nav').style.display='none';const first=!DB.users.length;
- $('main').innerHTML=`<div class="box" style="max-width:360px;margin:8vh auto"><h2 style="color:var(--d)">🦜 ${esc(DB.set.name)}</h2><p>${first?'First time here – create the Admin account.':'Sign in to continue.'}</p>
- <form onsubmit="return ${first?'setup':'login'}(event)">${first?'<label>Your name<input name="fname" required></label>':''}
+ const form=`<form onsubmit="return ${first?'setup':'login'}(event)">${first?'<label>Your name<input name="fname" required></label>':''}
  <label>Username<input name="username" required autocomplete="username"></label>
  <label>Password<input name="password" type="password" required minlength="6" autocomplete="current-password"></label>
  ${first?'<label>Confirm password<input name="confirm" type="password" required></label>':''}
- <button style="width:100%;margin-top:10px">${first?'Create admin and start':'Sign in'}</button><p id="lerr" class="neg"></p></form><details style="margin-top:12px"><summary>Connect GitHub storage</summary><label>GitHub username<input id="gO"></label><label>Private data repository<input id="gR"></label><label>Admin token<input id="gT" type="password"></label><button class="s" type="button" onclick="ghConnect()">Connect &amp; load data</button></details></div>`}
+ <button style="width:100%;margin-top:10px">${first?'Create admin and start':'Sign in'}</button><p id="lerr" class="neg"></p></form>`;
+ const conn=`<details ${first?'open':''} style="margin-top:12px"><summary>${first?'Load your existing accounts from GitHub':'Connect GitHub storage'}</summary>
+ <label>Setup link or code (from your admin)<input id="gCode" placeholder="Paste setup link or code"></label><button class="s" type="button" onclick="ghCode()">Connect</button>
+ <p><small>Or enter the details:</small></p><label>GitHub username<input id="gO"></label><label>Private data repository<input id="gR"></label><label>Token<input id="gT" type="password"></label><button class="s" type="button" onclick="ghConnect()">Connect &amp; load data</button></details>`;
+ $('#main').innerHTML=`<div class="box" style="max-width:380px;margin:6vh auto"><h2 style="color:var(--d)">🦜 ${esc(DB.set.name)}</h2>`+(first?`<p>No account found on this device yet. Connect to load your team's accounts.</p>${conn}<details style="margin-top:12px"><summary>First time ever? Create the admin account</summary>${form}</details>`:`<p>Sign in to continue.</p>${form}${conn}`)+`</div>`}
 async function setup(e){e.preventDefault();const f=new FormData(e.target),un=f.get('username').trim().toLowerCase();
  if(f.get('password')!=f.get('confirm')){$('#lerr').textContent='Passwords do not match';return false}
  const u={id:uid(),username:un,name:f.get('fname').trim(),role:'Admin',admin:true,active:true,perms:{},pass:await hash(un,f.get('password'))};
@@ -235,8 +238,8 @@ let ghSha=null,pushT=null,syncing=false;
 async function ghApi(path,opt){opt=opt||{};const g=GH(),r=await fetch('https://api.github.com/repos/'+g.owner+'/'+g.repo+path,{...opt,headers:{Authorization:'Bearer '+g.token,Accept:'application/vnd.github+json','Content-Type':'application/json'}});
  if(!r.ok)throw new Error(String(r.status));return r.status==204?null:r.json()}
 async function ghPull(){if(!GH().token)return false;let f;try{f=await ghApi('/contents/data.json')}catch(e){if(e.message=='404')return false;throw e}
- ghSha=f.sha;const rd=JSON.parse(ub64s(f.content));if((rd.ts||0)>(DB.ts||0)){DB=rd;DB.users=DB.users||[];try{localStorage.setItem('pp',JSON.stringify(DB))}catch(e){}return true}return false}
-async function ghPush(){if(!GH().token)return;const put=()=>ghApi('/contents/data.json',{method:'PUT',body:JSON.stringify({message:'Update data',content:b64s(JSON.stringify(DB)),...(ghSha?{sha:ghSha}:{})})});
+ ghSha=f.sha;const rd=JSON.parse(ub64s(f.content));if((rd.ts||0)>(DB.ts||0)||(!DB.users.length&&(rd.users||[]).length)){DB=rd;DB.users=DB.users||[];try{localStorage.setItem('pp',JSON.stringify(DB))}catch(e){}return true}return false}
+async function ghPush(){if(!GH().token||!DB.users.length)return;const put=()=>ghApi('/contents/data.json',{method:'PUT',body:JSON.stringify({message:'Update data',content:b64s(JSON.stringify(DB)),...(ghSha?{sha:ghSha}:{})})});
  try{ghSha=(await put()).content.sha}catch(e){if(!['409','422'].includes(e.message))throw e;try{ghSha=(await ghApi('/contents/data.json')).sha}catch(x){ghSha=null}ghSha=(await put()).content.sha}}
 function schedPush(){if(!GH().token)return;clearTimeout(pushT);pushT=setTimeout(()=>ghPush().catch(e=>toast('GitHub save failed ('+e.message+')')),4000)}
 function toast(m){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t)}t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',6000)}
@@ -245,25 +248,29 @@ async function pullReq(){let n=0;const loc=inbox();if(loc.length){loc.forEach(r=
   for(const i of is){if(i.pull_request)continue;let r;try{r=await dec(i.body)}catch(e){continue}n+=importReq(r);await ghApi('/issues/'+i.number,{method:'PATCH',body:JSON.stringify({state:'closed'})}).catch(()=>{})}}
  if(n){save();draw()}return n}
 async function autoSync(){if(!ME||syncing||!(ME.admin||has('orders','a')))return;syncing=true;try{const n=await pullReq();if(n)toast(n+' new online request(s) added to Enquiries / Orders / Quotations')}catch(e){}syncing=false}
-function startSync(){const go=()=>autoSync();if(GH().token)ghPull().then(ch=>{if(ch){ME=ME&&DB.users.find(u=>u.id==ME.id&&u.active)||null;draw()}go()}).catch(go);else go();setInterval(go,30000)}
+function startSync(){const go=()=>autoSync();if(GH().token)ghPull().then(ch=>{if(ch)ME=ME&&DB.users.find(u=>u.id==ME.id&&u.active)||null;draw();go()}).catch(()=>{draw();go()});else go();setInterval(go,30000)}
 window.addEventListener('storage',autoSync);
 async function ghSave(){const g={owner:$('#ghO').value.trim(),repo:$('#ghR').value.trim(),token:$('#ghT').value.trim()||GH().token};
  if(!g.owner||!g.repo||!g.token)return alert('Fill owner, repository and token.');localStorage.setItem('pp_gh',JSON.stringify(g));
  try{if(await ghPull()){toast('Loaded your data from GitHub');ME=DB.users.find(u=>ME&&u.id==ME.id&&u.active)||null;draw()}else{await ghPush();toast('Connected. Data saved to GitHub.')}}catch(e){toast('GitHub error '+e.message+' - check owner, repo and token')}}
+function applyCode(str){const m=String(str).match(/connect=([^&\s]+)/),c=m?m[1]:String(str).trim();try{const g=JSON.parse(ub64s(decodeURIComponent(c)));if(g.token&&g.owner&&g.repo){localStorage.setItem('pp_gh',JSON.stringify(g));return true}}catch(e){}return false}
+async function ghCode(){if(!applyCode($('#gCode').value))return alert('That setup code is not valid.');try{await ghPull();draw()}catch(e){alert('GitHub error '+e.message+' - the setup code may be expired or wrong.')}}
+function shareLink(){const g=GH();if(!g.token)return alert('Connect GitHub first.');$('#linkOut').value=location.origin+location.pathname+'#connect='+encodeURIComponent(b64s(JSON.stringify({owner:g.owner,repo:g.repo,token:g.token})))}
 async function ghConnect(){const g={owner:$('#gO').value.trim(),repo:$('#gR').value.trim(),token:$('#gT').value.trim()};if(!g.owner||!g.repo||!g.token)return alert('Fill all three boxes.');
  localStorage.setItem('pp_gh',JSON.stringify(g));try{await ghPull();draw()}catch(e){alert('GitHub error '+e.message+' - check owner, repo and token')}}
 function ghBox(){const g=GH();return`<div class="box"><h3>GitHub storage</h3><p><small>Your data is saved to a <b>private</b> repository on GitHub, so you can open the app on any device. The token stays on this device only.</small></p>
  <label>GitHub username<input id="ghO" value="${esc(g.owner)}"></label><label>Private data repository name<input id="ghR" value="${esc(g.repo)}"></label><label>Admin token ${g.token?'(saved - leave blank to keep)':''}<input id="ghT" type="password"></label>
  <button onclick="ghSave()">Save &amp; connect</button> <button class="s" onclick="ghPush().then(()=>toast('Saved to GitHub')).catch(e=>toast('Failed: '+e.message))">Save now</button>
- <h4>Customer page connection</h4><p><small>Customer requests are encrypted before they reach GitHub. Create keys once, then paste the text below into <code>config.js</code> (and add the customer token).</small></p>
+ <h4>Team access</h4><p><small>Send this link privately to staff. Opening it once on a device connects it, and they only sign in with their own username. Anyone with the link can reach your data, so treat it like a password.</small></p><button class="s" onclick="shareLink()">Create setup link</button><input id="linkOut" readonly style="width:100%;margin-top:8px"><h4>Customer page connection</h4><p><small>Customer requests are encrypted before they reach GitHub. Create keys once, then paste the text below into <code>config.js</code> (and add the customer token).</small></p>
  <button class="s" onclick="genKeys()">Create encryption keys</button> <button class="s" onclick="cfgText()">Show config.js text</button><textarea id="cfgOut" rows="5" readonly style="width:100%;margin-top:8px"></textarea></div>`}
 async function genKeys(){if(DB.set.privKey&&!confirm('Keys already exist. Creating new ones means unread old requests cannot be opened. Continue?'))return;
  const k=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['encrypt','decrypt']);
  DB.set.privKey=JSON.stringify(await crypto.subtle.exportKey('jwk',k.privateKey));DB.set.pubKey=JSON.stringify(await crypto.subtle.exportKey('jwk',k.publicKey));save();cfgText();toast('Keys created')}
 function cfgText(){const g=GH(),o=$('#cfgOut');if(!o)return;o.value=DB.set.pubKey?`const CFG={gh:{owner:'${g.owner||''}',repo:'${g.repo||''}',token:'PASTE_CUSTOMER_TOKEN_HERE',pub:${DB.set.pubKey}}};`:'Create encryption keys first.'}
 
+(function(){const m=location.hash.match(/connect=([^&]+)/);if(m){applyCode(m[0]);history.replaceState(null,'',location.pathname+location.search)}})();
 try{ME=DB.users.find(u=>u.id==localStorage.getItem('pp_me')&&u.active)||null}catch(e){}
-draw();
+if(GH().token&&!DB.users.length){$('nav').style.display='none';$('main').innerHTML='<p style="padding:30px">Loading your data from GitHub…</p>'}else draw();
 startSync();
 
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
