@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Printing Press | Order Printing Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="customer2.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#home">🦜 <span data-name>Printing Press</span></a>
+    <nav class="nav" id="nav">
+      <a href="#products">Products</a><a href="#how">How it works</a><a href="#services">Services</a><a href="#contact">Contact</a>
+    </nav>
+    <button class="enq-pill" id="enqOpen" type="button">🧾 Enquiry <b id="enqCount">0</b></button>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<main id="home">
+<section class="hero" id="quote">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <span class="tag">Fast · Affordable · Local</span>
+      <h1>Print anything.<br>Order in 2 minutes.</h1>
+      <p>Visiting cards, bill books, flyers, banners and more. Send your request and we confirm the price before we print.</p>
+      <ul class="ticks"><li>No payment online</li><li>Price confirmed before printing</li><li>Keep your reference number for any follow-up</li></ul>
+      <div class="mini">
+        <h3>Your enquiry list</h3>
+        <ul class="enq-list" id="quoteEnqList"></ul>
+        <p class="hint" id="quoteEnqEmpty">Tap "Add" on any product below to build your list.</p>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <form id="quoteForm" novalidate>
+        <h2>Request a quote</h2>
+        <div class="field"><label for="qType">I want to</label>
+          <select id="qType"><option>Quotation</option><option>Order</option><option>Enquiry</option></select></div>
+        <div class="row">
+          <div class="field"><label for="qName">Name *</label><input id="qName" required autocomplete="name" maxlength="80"></div>
+          <div class="field"><label for="qPhone">Phone *</label><input id="qPhone" type="tel" required inputmode="tel" maxlength="15"></div>
+        </div>
+        <div class="field"><label for="qEmail">Email</label><input id="qEmail" type="email" maxlength="100"></div>
+        <div class="row">
+          <div class="field"><label for="qProduct">Product *</label><select id="qProduct"></select></div>
+          <div class="field"><label for="qQty">Quantity *</label><input id="qQty" type="number" min="1" value="100"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="qSize">Size</label><input id="qSize" maxlength="60" placeholder="A4, 3.5x2 in"></div>
+          <div class="field"><label for="qPaper">Paper / material</label><input id="qPaper" maxlength="60"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="qSides">Printing</label><select id="qSides"><option>Single side</option><option>Double side</option></select></div>
+          <div class="field"><label for="qColour">Colour</label><select id="qColour"><option>Full colour</option><option>Black &amp; white</option></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="qDelivery">Delivery</label><select id="qDelivery"><option>I will pick up</option><option>Local delivery</option><option>Courier to another city</option></select></div>
+          <div class="field"><label for="qDate">Needed by</label><input id="qDate" type="date"></div>
+        </div>
+        <div class="field" id="qAddrBox" hidden><label for="qAddr">Delivery address</label><input id="qAddr" maxlength="200"></div>
+        <div class="field"><label for="qNotes">Notes</label><textarea id="qNotes" maxlength="400" placeholder="Wording, logo, anything else"></textarea></div>
+        <input class="hp" id="qHp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p class="hint">Have a design file? Send it on WhatsApp after you submit.</p>
+        <button id="qSubmit" class="btn btn-primary" type="submit" style="width:100%">Send request →</button>
+        <p class="err" id="qErr" role="alert"></p>
+      </form>
+      <div class="success" id="quoteDone" hidden>
+        <div class="tick" aria-hidden="true">✓</div>
+        <h2>Request received!</h2>
+        <div class="ref" id="quoteRef"></div>
+        <p>We will confirm details by phone or WhatsApp. Keep this reference number if you call us.</p>
+        <p><a class="btn btn-wa" data-wa="" id="quoteWa" href="#" target="_blank" rel="noopener">Continue on WhatsApp</a></p>
+        <p><button class="btn btn-ghost" id="quoteAgain" type="button">Send another</button></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="products">
+  <div class="wrap"><h2>What do you want to print?</h2><p class="sub">Choose a product, then add it to your enquiry or ask for a quote.</p>
+  <div class="grid" id="productGrid"></div></div>
+</section>
+
+<section class="section soft" id="how">
+  <div class="wrap"><h2>How it works</h2>
+  <div class="flow">
+    <div><span>1</span><b>Choose</b><p>Pick your product and details.</p></div>
+    <div><span>2</span><b>Send</b><p>Submit the request form.</p></div>
+    <div><span>3</span><b>Confirm</b><p>We call with the final price.</p></div>
+    <div><span>4</span><b>Print</b><p>You approve, we print.</p></div>
+    <div><span>5</span><b>Receive</b><p>Pick up or get it delivered.</p></div>
+  </div></div>
+</section>
+
+<section class="section" id="services">
+  <div class="wrap"><h2>Why choose us</h2>
+  <div class="why">
+    <div><i>🎨</i><b>Design help</b><p>No artwork? We design it for you.</p></div>
+    <div><i>✨</i><b>Finishing</b><p>Lamination, foil, folding, binding.</p></div>
+    <div><i>📦</i><b>Bulk rates</b><p>Better prices from 250 pieces.</p></div>
+    <div><i>⚡</i><b>Fast turnaround</b><p>Urgent jobs get priority.</p></div>
+    <div><i>🚚</i><b>Delivery</b><p>Pickup, local delivery or courier.</p></div>
+  </div></div>
+</section>
+
+<section class="section soft" id="contact">
+  <div class="wrap contact">
+    <div><h2>Talk to us</h2><p class="sub"><span data-name>Printing Press</span></p>
+      <p id="phoneBox">Call us from the number on our board</p></div>
+    <a class="btn btn-wa big" data-wa="Hello! I have a printing enquiry." href="#" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
+  </div>
+</section>
+</main>
+
+<footer class="foot"><div class="wrap">© <span id="yr"></span> <span data-name>Printing Press</span>. All rights reserved.</div></footer>
+<a class="btn btn-wa float-wa" data-wa="Hello! I would like to enquire about printing." href="#" target="_blank" rel="noopener">💬</a>
+
+<dialog id="eDlg"><div style="padding:24px">
+  <h3>My enquiry</h3>
+  <ul class="enq-list" id="eList"></ul>
+  <p class="hint" id="eEmpty">Your enquiry is empty. Add products from the list.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"><a class="btn btn-primary" href="#quote" id="eSend">Continue to quote</a><button class="btn btn-ghost" type="button" id="eClose">Close</button></div>
+</div></dialog>
+
+<script src="config.js"></script>
+<script src="customer.js"></script>
+</body>
+</html>
