@@ -45,7 +45,7 @@ $('#quoteForm').onsubmit=async e=>{e.preventDefault();const v=id=>$(id).value.tr
    if(!res.ok)throw new Error(res.status)}
   else{const a=JSON.parse(localStorage.getItem('pp_inbox')||'[]');a.push(r);localStorage.setItem('pp_inbox',JSON.stringify(a))}
   localStorage.setItem('pp_last',Date.now());
- }catch(x){$('#qSubmit').disabled=false;return err.textContent='Sorry, could not send. Please call or WhatsApp us.'}
+ }catch(x){$('#qSubmit').disabled=false;return err.textContent='Sorry, could not send ('+(x&&x.message?x.message:'error')+'). Please call or WhatsApp us.'}
  $('#qSubmit').disabled=false;
  $('#quoteRef').textContent=r.ref;$('#quoteWa').dataset.wa='Hello! I sent a request. Reference '+r.ref;if(WA)$('#quoteWa').href=WA+'?text='+encodeURIComponent($('#quoteWa').dataset.wa);else $('#quoteWa').style.display='none';
  basket=[];drawEnq();e.target.hidden=true;$('#quoteDone').hidden=false};
